@@ -1,74 +1,137 @@
--- Script Name: Auto Tennis Utility (Experimental Fix)
--- Purpose: Attempts to automate hitting and serving by calculating real-time positions.
--- NOTE: If this doesn't work, the game's internal RemoteEvents have likely changed their arguments or been patched.
+-- Script Name: Auto Tennis Utility with Basic Menu
+-- Purpose: Creates a simple toggle menu to control the Auto Hit and Auto Serve features.
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
 
--- Define Core Roblox Services and LocalPlayer
+-- Core Services
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 
--- Helper function to try and locate the ball in the Workspace
+-- State Variables
+local IsActive = false
+local AutoHitThread = nil
+local AutoServeThread = nil
+
+-- =========================================================================================
+-- UTILITY FUNCTIONS
+-- =========================================================================================
+
 local function findBall()
     -- !!! You may need to change "Ball" or "TennisBall" to the EXACT name used in the game !!!
     return Workspace:FindFirstChild("Ball") or Workspace:FindFirstChild("TennisBall") 
 end
 
--- =========================================================================================
--- AUTO HIT LOGIC
--- =========================================================================================
-while true do
-    local ball = findBall()
-    local character = LocalPlayer.Character
-    local camera = Workspace.CurrentCamera
+local function stopThreads()
+    if AutoHitThread and AutoHitThread.Status ~= "dead" then
+        task.cancel(AutoHitThread)
+    end
+    if AutoServeThread and AutoServeThread.Status ~= "dead" then
+        task.cancel(AutoServeThread)
+    end
+end
 
-    -- Only attempt to hit if all necessary game objects exist
-    if ball and character and camera then
-        
-        -- Calculate the necessary position vectors in real-time
-        local calculatedCamPos = camera.CFrame.p
-        local calculatedHitPos = ball.Position
-        local calculatedCamDir = camera.CFrame.LookVector
-        
-        -- Attempt to get the player's current velocity (more realistic than Vector3.new(0,0,0))
-        local calculatedVelocity = character:FindFirstChild("HumanoidRootPart") and character.HumanoidRootPart.Velocity or Vector3.new(0, 0, 0)
+-- =========================================================================================
+-- AUTOMATION LOGIC
+-- =========================================================================================
 
-        local hitBallArgs = {
+local function autoHitLoop()
+    while IsActive do
+        local ball = findBall()
+        local character = LocalPlayer.Character
+        local camera = Workspace.CurrentCamera
+
+        if ball and character and camera then
+            local calculatedCamPos = camera.CFrame.p
+            local calculatedHitPos = ball.Position
+            local calculatedCamDir = camera.CFrame.LookVector
+            local calculatedVelocity = character:FindFirstChild("HumanoidRootPart") and character.HumanoidRootPart.Velocity or Vector3.new(0, 0, 0)
+
+            local hitBallArgs = {
+                {
+                    CamPos = calculatedCamPos,
+                    HitPos = calculatedHitPos,
+                    HitBallType = 0,
+                    ClientTick = tick(),
+                    CamDir = calculatedCamDir,
+                    AttackMoveSpeed = calculatedVelocity 
+                }
+            }
+            
+            game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("HitBallRF"):InvokeServer(unpack(hitBallArgs))
+        end
+        task.wait()
+    end
+end
+
+local function autoServeLoop()
+    while IsActive do
+        local args = {
             {
-                CamPos = calculatedCamPos,
-                HitPos = calculatedHitPos,
-                HitBallType = 0, -- Try changing this to 1, 2, or 3 if 0 doesn't work
-                ClientTick = tick(), -- Time since game epoch
-                CamDir = calculatedCamDir,
-                AttackMoveSpeed = calculatedVelocity -- The player's current velocity
+                RotateType = 0, 
+                Power = 100 
             }
         }
         
-        -- Send the hit command to the server
-        game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("HitBallRF"):InvokeServer(unpack(hitBallArgs))
+        game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ServeRF"):InvokeServer(unpack(args))
+        task.wait(1) 
     end
-    task.wait()
 end
 
 -- =========================================================================================
--- AUTO SERVE LOGIC (Runs independently, may interfere with Auto Hit)
+-- GUI (MENU) CREATION
 -- =========================================================================================
-if not game:IsLoaded() then
-	game.Loaded:Wait()
-end
 
-while true do
-    -- This section is simpler, assuming the server only cares about power/rotation type.
-    local args = {
-        {
-            RotateType = 0, -- 0, 1, 2, 3
-            Power = 100 -- Speed Of The Ball (Max 100)
-        }
-    }
-    
-    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ServeRF"):InvokeServer(unpack(args))
-    task.wait(1) -- Added a wait of 1 second to prevent excessive spam
-end
+local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoTennisMenu"
+ScreenGui.Parent = PlayerGui
+
+local MenuFrame = Instance.new("Frame")
+MenuFrame.Size = UDim2.new(0, 200, 0, 80) -- Small, centered box
+MenuFrame.Position = UDim2.new(0.5, -100, 0.8, -40)
+MenuFrame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+MenuFrame.BorderSizePixel = 0
+MenuFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 20)
+Title.Text = "Auto Tennis"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+Title.Parent = MenuFrame
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, -20, 0, 30)
+ToggleButton.Position = UDim2.new(0, 10, 0, 40)
+ToggleButton.Text = "TOGGLE: OFF"
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.BackgroundColor3 = Color3.new(0.8, 0, 0) -- Red
+ToggleButton.Parent = MenuFrame
+
+-- =========================================================================================
+-- BUTTON FUNCTIONALITY
+-- =========================================================================================
+
+ToggleButton.MouseButton1Click:Connect(function()
+    if IsActive then
+        -- TURN OFF
+        IsActive = false
+        stopThreads()
+        ToggleButton.Text = "TOGGLE: OFF"
+        ToggleButton.BackgroundColor3 = Color3.new(0.8, 0, 0) -- Red
+    else
+        -- TURN ON
+        IsActive = true
+        
+        -- Start both loops on separate threads
+        AutoHitThread = task.spawn(autoHitLoop)
+        AutoServeThread = task.spawn(autoServeLoop)
+        
+        ToggleButton.Text = "TOGGLE: ON"
+        ToggleButton.BackgroundColor3 = Color3.new(0, 0.8, 0) -- Green
+    end
+end)
