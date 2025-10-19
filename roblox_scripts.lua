@@ -1,18 +1,23 @@
--- Script Name: Auto Tennis Utility with Menu (FINAL REVISION)
--- Purpose: Fixes GUI loading and uses minimal, robust remote calls for execution.
+-- Script Name: Auto Neo Tennis (Exploit-Level Revision)
+-- Purpose: Fixes GUI visibility and uses simplified, aggressive remote calls.
 
--- Core Services
+-- =========================================================================================
+-- CORE SERVICES & STATE
+-- =========================================================================================
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
--- State Variables
-local IsActive = false
+-- State Variables for the Toggles
+local IsAutoHitActive = false
+local IsAutoServeActive = false
 
--- =========================================================================================
--- UTILITY FUNCTIONS
--- =========================================================================================
+-- Remote Events/Functions (Caching them once)
+local HitBallRemote = nil -- We'll try to find both the RF and RE version
+local ServeRemote = nil
+local TossBallRemote = nil
 
 -- Function to safely find a remote event/function
 local function findRemote(remoteName)
@@ -20,106 +25,26 @@ local function findRemote(remoteName)
     if remotesFolder then
         return remotesFolder:FindFirstChild(remoteName)
     end
-    return nil
-end
-
-local function toggleState(newState)
-    IsActive = newState
-    local ToggleButton = LocalPlayer.PlayerGui.AutoTennisMenu.MenuFrame.ToggleButton
-
-    if IsActive then
-        ToggleButton.Text = "TOGGLE: ON (Active)"
-        ToggleButton.BackgroundColor3 = Color3.new(0, 0.6, 0) -- Green
-    else
-        ToggleButton.Text = "TOGGLE: OFF (Paused)"
-        ToggleButton.BackgroundColor3 = Color3.new(0.6, 0, 0) -- Red
-    end
+    -- Fallback: Check ReplicatedStorage directly in case the "Remotes" folder is gone
+    return ReplicatedStorage:FindFirstChild(remoteName)
 end
 
 -- =========================================================================================
--- AUTOMATION LOGIC (Simplified and More Robust)
+-- GUI (MENU) CREATION & FUNCTIONALITY (FIXED for Visibility)
 -- =========================================================================================
 
--- The main loop that tries to hit the ball
-RunService.Heartbeat:Connect(function()
-    if not IsActive then return end
-
-    -- The game likely uses a single Remote Function for all shot types (HitBall)
-    local HitBallRF = findRemote("HitBallRF") 
-    
-    if HitBallRF and LocalPlayer.Character then
-        local character = LocalPlayer.Character
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        
-        -- You saw a "Hit Power" bar, so the game is looking for an argument related to power.
-        -- We'll try to invoke the server with the minimal arguments needed.
-
-        -- Attempt 1: Minimal Invoke (most likely to bypass complex checks)
-        local success, result = pcall(HitBallRF.InvokeServer, HitBallRF, {
-            HitBallType = 1, -- Try a default shot type
-            Power = 100      -- Try max power
-        })
-        
-        -- Attempt 2: If the game doesn't like a table, try multiple arguments (less common for modern games)
-        -- local success, result = pcall(HitBallRF.InvokeServer, HitBallRF, 100, 1)
-
-        if not success then
-            -- print("Error invoking HitBallRF:", result) -- Uncomment for debugging
-        end
-    end
-end)
-
--- Separate function to handle the serve (usually a specific remote)
-local function executeServe()
-    if not IsActive then return end
-    
-    local TossBallRE = findRemote("TossBallRE") -- Event for the toss/jump
-    local ServeRF = findRemote("ServeRF")       -- Function for the final hit
-    
-    if TossBallRE then
-        TossBallRE:FireServer()
-        task.wait(0.1) -- Wait for the ball to be tossed
-    end
-
-    if ServeRF then
-        -- The serve likely needs a rotation type and power to be considered valid
-        pcall(ServeRF.InvokeServer, ServeRF, {
-            RotateType = 1, -- Default spin
-            Power = 100     -- Max power
-        })
-    end
-end
-
--- Create a loop to spam the serve attempt when the player is in the serving position
-task.spawn(function()
-    while true do
-        if IsActive then
-            -- This wait is critical. Too fast, and you might get kicked.
-            task.wait(0.7) 
-            executeServe()
-        end
-        task.wait(0.2)
-    end
-end)
-
--- =========================================================================================
--- GUI (MENU) CREATION & FUNCTIONALITY (FIXED)
--- =========================================================================================
-
--- Wait until the PlayerGui is available before creating the GUI
-task.wait(1) 
-
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+-- IMPORTANT FIX: Use CoreGui if available, otherwise default to PlayerGui
+local GuiTarget = game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoTennisMenu"
-ScreenGui.Parent = PlayerGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global -- Ensures it's on top
+ScreenGui.Parent = GuiTarget
 
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 200, 0, 80)
--- Centered position (better than the previous fixed value)
-MenuFrame.Position = UDim2.new(0.5, -100, 0.85, -40) 
-MenuFrame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+MenuFrame.Size = UDim2.new(0, 200, 0, 115) -- Increased size for 2 buttons
+MenuFrame.Position = UDim2.new(0.5, -100, 0.85, -57) -- Centered
+MenuFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
 MenuFrame.BorderSizePixel = 0
 MenuFrame.Parent = ScreenGui
 
@@ -127,22 +52,99 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 20)
 Title.Text = "Auto Neo Tennis"
 Title.TextColor3 = Color3.new(1, 1, 1)
-Title.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+Title.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
 Title.Parent = MenuFrame
 
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "ToggleButton" -- Added Name for better access in toggleState
-ToggleButton.Size = UDim2.new(1, -20, 0, 30)
-ToggleButton.Position = UDim2.new(0, 10, 0, 40)
-ToggleButton.Text = "TOGGLE: OFF (Paused)"
-ToggleButton.TextColor3 = Color3.new(1, 1, 1)
-ToggleButton.BackgroundColor3 = Color3.new(0.6, 0, 0)
-ToggleButton.Parent = MenuFrame
+-- Helper function to create buttons
+local function createToggle(name, yPos)
+    local button = Instance.new("TextButton")
+    button.Name = name .. "Button"
+    button.Size = UDim2.new(1, -20, 0, 30)
+    button.Position = UDim2.new(0, 10, 0, yPos)
+    button.Text = name .. ": OFF"
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.BackgroundColor3 = Color3.new(0.6, 0, 0)
+    button.Parent = MenuFrame
+    return button
+end
 
--- BUTTON FUNCTIONALITY
-ToggleButton.MouseButton1Click:Connect(function()
-    toggleState(not IsActive)
+local AutoHitButton = createToggle("AutoHit", 30)
+local AutoServeButton = createToggle("AutoServe", 70)
+
+local function updateButton(button, isActive)
+    button.Text = button.Name:gsub("Button", "") .. (isActive and ": ON" or ": OFF")
+    button.BackgroundColor3 = isActive and Color3.new(0, 0.6, 0) or Color3.new(0.6, 0, 0)
+end
+
+AutoHitButton.MouseButton1Click:Connect(function()
+    IsAutoHitActive = not IsAutoHitActive
+    updateButton(AutoHitButton, IsAutoHitActive)
 end)
 
--- Initialize the script state
-toggleState(false)
+AutoServeButton.MouseButton1Click:Connect(function()
+    IsAutoServeActive = not IsAutoServeActive
+    updateButton(AutoServeButton, IsAutoServeActive)
+end)
+
+-- Initialize button states
+updateButton(AutoHitButton, IsAutoHitActive)
+updateButton(AutoServeButton, IsAutoServeActive)
+
+
+-- =========================================================================================
+-- AUTOMATION LOGIC (Aggressive/Simplified)
+-- =========================================================================================
+
+-- 1. Auto Hit Loop (Spamming the "Strike" remote)
+task.spawn(function()
+    HitBallRemote = findRemote("HitBallRF") or findRemote("HitBallRE")
+    
+    while true do
+        if IsAutoHitActive and HitBallRemote then
+            
+            -- AGGRESSIVE ATTEMPT: Fire with NO arguments, which sometimes forces a default action.
+            -- This bypasses all the complex camera/position/power arguments.
+            if HitBallRemote:IsA("RemoteFunction") then
+                pcall(HitBallRemote.InvokeServer, HitBallRemote)
+            elseif HitBallRemote:IsA("RemoteEvent") then
+                HitBallRemote:FireServer()
+            end
+
+            task.wait(0.01) -- Very fast loop to ensure the ball is caught
+        end
+        task.wait(0.01)
+    end
+end)
+
+
+-- 2. Auto Serve Loop (Spamming the "Serve" remotes)
+task.spawn(function()
+    TossBallRemote = findRemote("TossBallRE") or findRemote("TossBallRF")
+    ServeRemote = findRemote("ServeRF") or findRemote("ServeRE")
+
+    while true do
+        if IsAutoServeActive then
+            if TossBallRemote then
+                -- Step 1: Toss the ball
+                if TossBallRemote:IsA("RemoteFunction") then
+                    pcall(TossBallRemote.InvokeServer, TossBallRemote)
+                else
+                    TossBallRemote:FireServer()
+                end
+                
+                task.wait(0.1) -- Short wait for the toss animation
+            end
+
+            if ServeRemote then
+                -- Step 2: Hit the serve
+                if ServeRemote:IsA("RemoteFunction") then
+                    -- If it's a function, we'll send the minimal power argument again just in case
+                    pcall(ServeRemote.InvokeServer, ServeRemote, { Power = 100 })
+                else
+                    ServeRemote:FireServer()
+                end
+            end
+        end
+        task.wait(0.5) -- Slow the serve loop down to avoid anti-cheat/kick
+    end
+end)
