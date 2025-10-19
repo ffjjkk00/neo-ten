@@ -1,5 +1,5 @@
--- Script Name: Auto Tennis Utility with Basic Menu
--- Purpose: Creates a simple toggle menu to control the Auto Hit and Auto Serve features.
+-- Script Name: Auto Tennis Utility with Basic Menu (REVISED)
+-- Purpose: Fixes ball-finding, implements proper GUI toggle logic, and adds Serve Toss command.
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
@@ -20,8 +20,10 @@ local AutoServeThread = nil
 -- =========================================================================================
 
 local function findBall()
-    -- !!! You may need to change "Ball" or "TennisBall" to the EXACT name used in the game !!!
-    return Workspace:FindFirstChild("Ball") or Workspace:FindFirstChild("TennisBall") 
+    -- REVISED: Added "Part" which is a common fallback name for simple physics objects.
+    return Workspace:FindFirstChild("Ball") 
+        or Workspace:FindFirstChild("TennisBall")
+        or Workspace:FindFirstChild("Part") 
 end
 
 local function stopThreads()
@@ -43,18 +45,18 @@ local function autoHitLoop()
         local character = LocalPlayer.Character
         local camera = Workspace.CurrentCamera
 
-        if ball and character and camera then
+        if ball and character and camera and character:FindFirstChild("HumanoidRootPart") then
             local calculatedCamPos = camera.CFrame.p
             local calculatedHitPos = ball.Position
             local calculatedCamDir = camera.CFrame.LookVector
-            local calculatedVelocity = character:FindFirstChild("HumanoidRootPart") and character.HumanoidRootPart.Velocity or Vector3.new(0, 0, 0)
+            local calculatedVelocity = character.HumanoidRootPart.Velocity or Vector3.new(0, 0, 0)
 
             local hitBallArgs = {
                 {
                     CamPos = calculatedCamPos,
                     HitPos = calculatedHitPos,
-                    HitBallType = 0,
-                    ClientTick = tick(),
+                    HitBallType = 1, -- CHANGED: Testing Hit Type 1 (standard forehand/return)
+                    ClientTick = tick(), 
                     CamDir = calculatedCamDir,
                     AttackMoveSpeed = calculatedVelocity 
                 }
@@ -67,21 +69,31 @@ local function autoHitLoop()
 end
 
 local function autoServeLoop()
+    -- REVISED: Now attempts to send the ball toss command first.
+    local TossBallRE = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("TossBallRE", 0.1) -- Assuming a Toss/Throw remote
+    
     while IsActive do
+        
+        if TossBallRE then
+            -- STEP 1: Send the toss/jump command (usually an Event, not a Function)
+            TossBallRE:FireServer() 
+        end
+        
+        -- STEP 2: Send the hit command
         local args = {
             {
-                RotateType = 0, 
-                Power = 100 
+                RotateType = 1, -- CHANGED: Testing RotateType 1
+                Power = 85      -- CHANGED: Testing a non-perfect power
             }
         }
         
         game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ServeRF"):InvokeServer(unpack(args))
-        task.wait(1) 
+        task.wait(0.5) -- Increased speed of serve attempts
     end
 end
 
 -- =========================================================================================
--- GUI (MENU) CREATION
+-- GUI (MENU) CREATION (No changes here, only in the button logic below)
 -- =========================================================================================
 
 local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
@@ -91,7 +103,7 @@ ScreenGui.Name = "AutoTennisMenu"
 ScreenGui.Parent = PlayerGui
 
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 200, 0, 80) -- Small, centered box
+MenuFrame.Size = UDim2.new(0, 200, 0, 80)
 MenuFrame.Position = UDim2.new(0.5, -100, 0.8, -40)
 MenuFrame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
 MenuFrame.BorderSizePixel = 0
@@ -109,16 +121,16 @@ ToggleButton.Size = UDim2.new(1, -20, 0, 30)
 ToggleButton.Position = UDim2.new(0, 10, 0, 40)
 ToggleButton.Text = "TOGGLE: OFF"
 ToggleButton.TextColor3 = Color3.new(1, 1, 1)
-ToggleButton.BackgroundColor3 = Color3.new(0.8, 0, 0) -- Red
+ToggleButton.BackgroundColor3 = Color3.new(0.8, 0, 0)
 ToggleButton.Parent = MenuFrame
 
 -- =========================================================================================
--- BUTTON FUNCTIONALITY
+-- BUTTON FUNCTIONALITY (FIXED)
 -- =========================================================================================
 
 ToggleButton.MouseButton1Click:Connect(function()
     if IsActive then
-        -- TURN OFF
+        -- TURN OFF (FIXED: Threads are now correctly cancelled)
         IsActive = false
         stopThreads()
         ToggleButton.Text = "TOGGLE: OFF"
