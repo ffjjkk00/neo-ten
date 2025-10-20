@@ -1,3 +1,30 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+--Auto Hit (DO NOT CHANGE THE VALUES!)
+
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
+while true do
+    local hitBallArgs = {
+        {
+            CamPos = Vector3.new(0, 0, 0),
+            HitPos = Vector3.new(0, 0, 0),
+            HitBallType = 0,
+            ClientTick = 0,
+            CamDir = Vector3.new(0, 0, 0),
+            AttackMoveSpeed = Vector3.new(0, 0, 0)
+        }
+    }
+
+    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("HitBallRF"):InvokeServer(unpack(hitBallArgs))
+task.wait()
+end
+
+--Auto Serve (YOU CAN CHANGE THE VALUES!)
+
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
@@ -5,7 +32,7 @@ end
 while true do
     local args = {
 	{
-		RotateType = 0, --0, 1, 2 ,3
+		RotateType = 1, --0, 1, 2 ,3
 		Power = 100 --Speed Of The Ball (Max 100)
 	}
 }
