@@ -1,54 +1,108 @@
---[[
-	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
-    
-    NOTE: Auto Hit works because the server accepts the dummy data.
-    Auto Serve has been modified with extra dummy arguments (Position, ClientTick) 
-    to bypass stricter server validation.
-]]
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
---Auto Hit (DO NOT CHANGE THE VALUES!)
-if not game:IsLoaded() then
-	game.Loaded:Wait()
-end
+local Window = Rayfield:CreateWindow({
+   Name = "Tennis All-in-One 🎾",
+   LoadingTitle = "Script by ffjjkk00",
+   LoadingSubtitle = "Gemini UI Edition",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "ffjjkk00_Settings",
+      FileName = "Config"
+   }
+})
 
--- Auto Hit Loop: Continuously fires the HitBall Remote Function
-while true do
-    local hitBallArgs = {
-        {
-            CamPos = Vector3.new(0, 0, 0),
-            HitPos = Vector3.new(0, 0, 0),
-            HitBallType = 0,
-            ClientTick = 0,
-            CamDir = Vector3.new(0, 0, 0),
-            AttackMoveSpeed = Vector3.new(0, 0, 0)
-        }
-    }
+-- [[ 🛠️ ตัวแปรหลักจากโค้ดของคุณ ]]
+getgenv().PowerValue = 100
+getgenv().PerfectMode = true
+getgenv().ServeModEnabled = true -- เพิ่มตัวเลือกเปิด/ปิดระบบ
 
-    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("HitBallRF"):InvokeServer(unpack(hitBallArgs))
-    task.wait()
-end
+-- [[ 📑 หน้าเมนู ]]
+local Tab = Window:CreateTab("Main Settings", 4483362458)
 
---Auto Serve (Modified with extra arguments for reliability)
+Tab:CreateSection("Power & Perfect Control")
 
-if not game:IsLoaded() then
-	game.Loaded:Wait()
-end
+Tab:CreateToggle({
+   Name = "Enable Script (เปิดใช้งานสคริปต์)",
+   CurrentValue = true,
+   Flag = "ScriptToggle",
+   Callback = function(Value)
+      getgenv().ServeModEnabled = Value
+   end,
+})
 
--- Auto Serve Loop: Continuously fires the Serve Remote Function
-while true do
-    local args = {
-	{
-		RotateType = 0, -- Spin type: 0, 1, 2 ,3 (try other numbers if 0 fails)
-		Power = 100, -- Speed of the ball (Max 100)
-        
-        -- **NEW DUMMY ARGUMENTS ADDED FOR SERVER VALIDATION:**
-        Position = Vector3.new(0, 0, 0),
-        ClientTick = math.random(100000, 999999) 
-	}
-}
+Tab:CreateToggle({
+   Name = "Perfect Mode (ลูกตบ/Perfect)",
+   CurrentValue = true,
+   Flag = "PerfectToggle",
+   Callback = function(Value)
+      getgenv().PerfectMode = Value
+   end,
+})
 
-    -- NOTE: You may need to change the 'task.wait(0.2)' if it is still not working
-    -- A higher number can bypass aggressive anti-spam measures.
-    game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ServeRF"):InvokeServer(unpack(args))
-    task.wait(0.2) 
-end
+Tab:CreateSlider({
+   Name = "Hit/Serve Power",
+   Range = {0, 300},
+   Increment = 10,
+   Suffix = "Power",
+   CurrentValue = 100,
+   Flag = "PowerSlider",
+   Callback = function(Value)
+      getgenv().PowerValue = Value
+   end,
+})
+
+-- [[ ⚙️ ระบบเบื้องหลัง (ใช้ Logic เดิมของคุณทั้งหมด) ]]
+local mt = getrawmetatable(game)
+local old = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- เช็คว่าเปิดใช้งานสคริปต์อยู่หรือไม่
+    if not getgenv().ServeModEnabled then 
+        return old(self, ...) 
+    end
+
+    if method == "InvokeServer" or method == "FireServer" then
+        -- ส่วนการ Serve
+        if tostring(self) == "ServeRF" then
+            args[1].Power = getgenv().PowerValue
+            args[1].RotateType = 3
+            return old(self, unpack(args))
+        end
+
+        -- ส่วนการตีลูก (HitBallRF)
+        if tostring(self) == "HitBallRF" then
+            if getgenv().PerfectMode then
+                args[1].HitBallType = 7 
+            end
+            
+            if not args[1].ExtendParams then
+                args[1].ExtendParams = {
+                    RotateType = 3,
+                    Power = getgenv().PowerValue
+                }
+            else
+                args[1].ExtendParams.Power = getgenv().PowerValue
+                args[1].ExtendParams.RotateType = 3
+            end
+            
+            return old(self, unpack(args))
+        end
+    end
+
+    return old(self, ...)
+end)
+
+setreadonly(mt, true)
+
+Rayfield:Notify({
+   Title = "ffjjkk00 Script",
+   Content = "โหลดหน้าเมนูสำเร็จ!",
+   Duration = 5,
+   Image = 4483362458,
+})
+
+print("All-in-One Tennis Script: ffjjkk00 with UI")
