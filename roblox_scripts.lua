@@ -1,54 +1,49 @@
--- [[ ดึง UI Library มาใช้งาน ]]
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- [[ สร้างหน้าต่างหลัก ]]
+-- สร้าง Window
 local Window = Rayfield:CreateWindow({
-   Name = "Tennis All-in-One 🎾",
-   LoadingTitle = "Script by ffjjkk00",
-   LoadingSubtitle = "Gemini UI Edition",
+   Name = "All-in-One Tennis Script | ffjjkk00",
+   LoadingTitle = "Tennis Pro Hub",
+   LoadingSubtitle = "by Gemini",
    ConfigurationSaving = {
-      Enabled = false -- ปิดไว้ก่อนเพื่อให้รันง่ายที่สุด
+      Enabled = true,
+      FolderName = "TennisScriptConfig",
+      FileName = "Settings"
    }
 })
 
--- [[ ตั้งค่าตัวแปร (ใช้ Logic ของคุณ) ]]
+-- ค่าเริ่มต้น (Global Variables)
 getgenv().PowerValue = 100
 getgenv().PerfectMode = true
-getgenv().ScriptEnabled = true
 
--- [[ สร้างเมนูควบคุม ]]
-local Tab = Window:CreateTab("Settings", 4483362458)
+-- สร้าง Tab หลัก
+local MainTab = Window:CreateTab("Main Settings", 4483362458) -- ไอคอนฟันเฟือง
 
-Tab:CreateSection("Main Controls")
+-- ส่วนประกอบของ UI
+local Section = MainTab:CreateSection("Server & Hit Controls")
 
-Tab:CreateToggle({
-   Name = "Enable Script (เปิด/ปิด ระบบ)",
+MainTab:CreateToggle({
+   Name = "Perfect Mode (ตีติด Perfect)",
    CurrentValue = true,
-   Callback = function(Value)
-      getgenv().ScriptEnabled = Value
-   end,
-})
-
-Tab:CreateToggle({
-   Name = "Perfect Mode (บังคับ Perfect)",
-   CurrentValue = true,
+   Flag = "PerfectModeToggle",
    Callback = function(Value)
       getgenv().PerfectMode = Value
    end,
 })
 
-Tab:CreateSlider({
-   Name = "Power (ความแรง)",
-   Range = {0, 300},
-   Increment = 10,
+MainTab:CreateSlider({
+   Name = "Power Value (ความแรง)",
+   Range = {0, 500},
+   Increment = 1,
    Suffix = "Power",
    CurrentValue = 100,
+   Flag = "PowerSlider",
    Callback = function(Value)
       getgenv().PowerValue = Value
    end,
 })
 
--- [[ ระบบเบื้องหลัง (Logic ที่คุณต้องการ) ]]
+-- เมธอด Metatable Hook (ตัวดั้งเดิมที่คุณให้มา)
 local mt = getrawmetatable(game)
 local old = mt.__namecall
 setreadonly(mt, false)
@@ -57,21 +52,18 @@ mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
 
-    -- ถ้ากดปิดสคริปต์ใน UI ให้ทำงานปกติ
-    if not getgenv().ScriptEnabled then 
-        return old(self, ...) 
-    end
-
     if method == "InvokeServer" or method == "FireServer" then
-        -- แก้ไขการ Serve
+        
+        -- จัดการการ Serve
         if tostring(self) == "ServeRF" then
             args[1].Power = getgenv().PowerValue
             args[1].RotateType = 3
             return old(self, unpack(args))
         end
 
-        -- แก้ไขการตี (HitBallRF)
+        -- จัดการการตีลูก (HitBall)
         if tostring(self) == "HitBallRF" then
+            
             if getgenv().PerfectMode then
                 args[1].HitBallType = 7 
             end
@@ -95,12 +87,9 @@ end)
 
 setreadonly(mt, true)
 
-
 Rayfield:Notify({
-   Title = "Success!",
-   Content = "สคริปต์ทำงานแล้ว ปรับค่าได้ในเมนูเลย",
+   Title = "Script Loaded!",
+   Content = "พร้อมใช้งานแล้วครับ ffjjkk00",
    Duration = 5,
    Image = 4483362458,
 })
-
-print("Tennis Script Loaded Successfully!")
